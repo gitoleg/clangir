@@ -170,7 +170,7 @@ cir::FuncOp LoweringPreparePass::buildCXXGlobalVarDeclInitFunc(GlobalOp op) {
                                        builder.getI8Type());
 
     // Look for the destructor call in dtorBlock
-    auto &dtorBlock = dtorRegion().front();
+    auto &dtorBlock = dtorRegion.front();
     mlir::cir::CallOp dtorCall;
     for (auto op : reverse(dtorBlock.getOps<mlir::cir::CallOp>())) {
       dtorCall = op;
