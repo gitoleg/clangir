@@ -664,7 +664,7 @@ CIRDataLayout::CIRDataLayout(mlir::ModuleOp modOp) : layout{modOp} {
                     .dyn_cast<mlir::DataLayoutSpecAttr>();
   assert(dlSpec && "expected dl_spec in the module");
   auto entries = dlSpec.getEntries();
-
+  allocaAddrSpace = 0;
   for (auto entry : entries) {
     auto entryKey = entry.getKey();
     auto strKey = entryKey.dyn_cast<mlir::StringAttr>();

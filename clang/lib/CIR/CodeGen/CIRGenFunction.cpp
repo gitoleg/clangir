@@ -1382,6 +1382,39 @@ void CIRGenFunction::checkTargetFeatures(SourceLocation Loc,
   }
 }
 
+CIRGenFunction::VlaSizePair CIRGenFunction::getVLASize(QualType type) {  
+  const VariableArrayType *vla = CGM.getASTContext().getAsVariableArrayType(type);
+  assert(vla && "type was not a variable array type!");
+  return getVLASize(vla);
+}
+
+CIRGenFunction::VlaSizePair
+CIRGenFunction::getVLASize(const VariableArrayType *type) {
+  // The number of elements so far; always size_t.
+  mlir::Value numElements;
+
+  QualType elementType;
+  do {
+    elementType = type->getElementType();
+    mlir::Value vlaSize = VLASizeMap[type->getSizeExpr()];
+    assert(vlaSize && "no size for VLA!");
+    assert(vlaSize.getType() == SizeTy);
+
+    if (!numElements) {
+      numElements = vlaSize;
+    } else {
+      // It's undefined behavior if this wraps around, so mark it that way.
+      // FIXME: Teach -fsanitize=undefined to trap this.
+
+      // TODO: THINK HERE!!
+      //numElements = Builder.CreateNUWMul(numElements, vlaSize);
+      numElements = builder.createMul(numElements, vlaSize);
+    }
+  } while ((type = getContext().getAsVariableArrayType(elementType)));
+
+  return { numElements, elementType };
+}
+
 void CIRGenFunction::buildVariablyModifiedType(QualType type) {
   assert(type->isVariablyModifiedType() &&
          "Must pass variably modified type to EmitVLASizes!");

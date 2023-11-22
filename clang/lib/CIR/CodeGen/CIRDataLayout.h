@@ -21,6 +21,7 @@ namespace cir {
 
 class CIRDataLayout {
   bool bigEndian = false;
+  unsigned allocaAddrSpace;
 
 public:
   mlir::DataLayout layout;
@@ -75,6 +76,8 @@ public:
                                          getPointerTypeSizeInBits(Ty), false);
     return IntTy;
   }
+
+  unsigned getAllocaAddrSpace() const { return allocaAddrSpace; }
 };
 
 } // namespace cir

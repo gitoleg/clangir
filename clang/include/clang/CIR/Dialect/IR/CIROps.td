@@ -299,6 +299,7 @@ def AllocaOp : CIR_Op<"alloca", [
   }];
 
   let arguments = (ins
+    CIR_IntType:$arraySize,
     TypeAttr:$allocaType,
     StrAttr:$name,
     UnitAttr:$init,
@@ -324,7 +325,7 @@ def AllocaOp : CIR_Op<"alloca", [
   // FIXME: we should not be printing `cir.ptr` below, that should come
   // from the pointer type directly.
   let assemblyFormat = [{
-    $allocaType `,` `cir.ptr` type($addr) `,`
+    $allocaType `,` `cir.ptr` type($addr) `,` type($arraySize)`,`$arraySize`,`
     `[` $name
        (`,` `init` $init^)?
     `]`
@@ -2194,6 +2195,21 @@ def ZeroInitConstOp : CIR_Op<"llvmir.zeroinit", [Pure]>,
   }];
   let assemblyFormat = "attr-dict `:` type($result)";
   let hasVerifier = 0;
+}
+
+def StackSaveOp : CIR_Op<"stacksave"> {
+  let summary = "TODO";
+  let description = [{ TODO }];
+  let results = (outs AnyType:$result);
+  let assemblyFormat = "attr-dict `:` type($result)";
+}
+
+def StackRestoreOp : CIR_Op<"stackrestore"> {
+  let summary = "TODO";
+  let description = [{ TODO }];
+
+  let arguments = (ins CIR_PointerType:$ptr);
+  let assemblyFormat = "$ptr attr-dict `:` qualified(type($ptr))";
 }
 
 #endif // MLIR_CIR_DIALECT_CIR_OPS
