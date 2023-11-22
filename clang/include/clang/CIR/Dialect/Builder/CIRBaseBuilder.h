@@ -111,6 +111,10 @@ public:
     return createBinop(lhs, mlir::cir::BinOpKind::Or, rhs);
   }
 
+  mlir::Value createMul(mlir::Value lhs, mlir::Value rhs) {
+    return createBinop(lhs, mlir::cir::BinOpKind::Mul, rhs);
+  }
+
   //===--------------------------------------------------------------------===//
   // Cast/Conversion Operators
   //===--------------------------------------------------------------------===//

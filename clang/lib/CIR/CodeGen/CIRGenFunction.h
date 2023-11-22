@@ -690,6 +690,20 @@ public:
 
   void buildVariablyModifiedType(QualType Ty);
 
+  struct VlaSizePair {
+    mlir::Value NumElts;
+    QualType Type;
+
+    VlaSizePair(mlir::Value NE, QualType T) : NumElts(NE), Type(T) {}
+  };
+
+  /// Returns an MLIR value that corresponds to the size,
+  /// in non-variably-sized elements, of a variable length array type,
+  /// plus that largest non-variably-sized element type.  Assumes that
+  /// the type has already been emitted with buildVariablyModifiedType.
+  VlaSizePair getVLASize(const VariableArrayType *vla);
+  VlaSizePair getVLASize(QualType vla);
+
   mlir::Value emitBuiltinObjectSize(const Expr *E, unsigned Type,
                                     mlir::cir::IntType ResType,
                                     mlir::Value EmittedE, bool IsDynamic);
@@ -1037,7 +1051,8 @@ public:
     mlir::Value NRVOFlag{};
 
     struct Invalid {};
-    AutoVarEmission(Invalid) : Variable(nullptr), Addr(Address::invalid()) {}
+    AutoVarEmission(Invalid) 
+      : Variable(nullptr), Addr(Address::invalid()) {}
 
     AutoVarEmission(const clang::VarDecl &variable)
         : Variable(&variable), Addr(Address::invalid()) {}
@@ -1216,6 +1231,8 @@ public:
 
   void pushEHDestroy(QualType::DestructionKind dtorKind, Address addr,
                      QualType type);
+
+  void pushStackRestore(CleanupKind kind, Address SPMem);
 
   static bool
   IsConstructorDelegationValid(const clang::CXXConstructorDecl *Ctor);

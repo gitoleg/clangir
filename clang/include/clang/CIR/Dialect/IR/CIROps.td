@@ -2506,6 +2506,7 @@ def ZeroInitConstOp : CIR_Op<"llvmir.zeroinit", [Pure]>,
   let hasVerifier = 0;
 }
 
+<<<<<<< HEAD
 def AsmATT : I32EnumAttrCase<"x86_att", 0>;
 def AsmIntel : I32EnumAttrCase<"x86_intel", 1>;
 
@@ -2543,3 +2544,21 @@ def CIR_InlineAsmOp : CIR_Op<"asm", [RecursiveMemoryEffects]> {
 }
 
 #endif // MLIR_CIR_DIALECT_CIR_OPS
+=======
+def StackSaveOp : CIR_Op<"stacksave"> {
+  let summary = "TODO";
+  let description = [{ TODO }];
+  let results = (outs AnyType:$result);
+  let assemblyFormat = "attr-dict `:` type($result)";
+}
+
+def StackRestoreOp : CIR_Op<"stackrestore"> {
+  let summary = "TODO";
+  let description = [{ TODO }];
+
+  let arguments = (ins CIR_PointerType:$ptr);
+  let assemblyFormat = "$ptr attr-dict `:` qualified(type($ptr))";
+}
+
+#endif // MLIR_CIR_DIALECT_CIR_OPS
+>>>>>>> d339be121e98 (wip)
