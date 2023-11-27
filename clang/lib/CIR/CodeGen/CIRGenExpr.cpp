@@ -1173,6 +1173,10 @@ Address CIRGenFunction::buildArrayToPointerDecay(const Expr *E,
       Addr.getPointer().getType().dyn_cast<mlir::cir::PointerType>();
   assert(lvalueAddrTy && "expected pointer");
 
+  // TODO: TMP, there is an assertion bellow, where we fail on, Think here
+  if (E->getType()->isVariableArrayType())
+    return Addr;
+
   auto pointeeTy = lvalueAddrTy.getPointee().dyn_cast<mlir::cir::ArrayType>();
   assert(pointeeTy && "expected array");
 
