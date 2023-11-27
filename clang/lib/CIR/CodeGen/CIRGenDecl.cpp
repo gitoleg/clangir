@@ -173,7 +173,7 @@ CIRGenFunction::buildAutoVarAlloca(const VarDecl &D) {
 
       // Push a cleanup block and restore the stack there.
       // FIXME: in general circumstances, this should be an EH cleanup.
-      pushStackRestore(NormalCleanup, Stack);      
+      pushStackRestore(NormalCleanup, Stack);
     }
 
     auto VlaSize = getVLASize(Ty);
