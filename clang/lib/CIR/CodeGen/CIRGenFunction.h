@@ -541,6 +541,7 @@ public:
   /// Tracks function scope overall cleanup handling.
   EHScopeStack EHStack;
   llvm::SmallVector<char, 256> LifetimeExtendedCleanupStack;
+  EHScopeStack::stable_iterator PrologueCleanupDepth;
 
   /// A mapping from NRVO variables to the flags used to indicate
   /// when the NRVO has been applied to this variable.

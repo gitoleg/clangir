@@ -492,7 +492,7 @@ CIRGenFunction::generateCode(clang::GlobalDecl GD, mlir::cir::FuncOp Fn,
   // Create a scope in the symbol table to hold variable declarations.
   SymTableScopeTy varScope(symbolTable);
 
-  {
+  //{
     // Compiler synthetized functions might have invalid slocs...
     auto bSrcLoc = FD->getBody()->getBeginLoc();
     auto eSrcLoc = FD->getBody()->getEndLoc();
@@ -549,7 +549,7 @@ CIRGenFunction::generateCode(clang::GlobalDecl GD, mlir::cir::FuncOp Fn,
       llvm_unreachable("no definition for emitted function");
 
     assert(builder.getInsertionBlock() && "Should be valid");
-  }
+  //}
 
   if (mlir::failed(Fn.verifyBody()))
     return nullptr;
@@ -577,6 +577,11 @@ CIRGenFunction::generateCode(clang::GlobalDecl GD, mlir::cir::FuncOp Fn,
       builder.clearInsertionPoint();
     }
   }
+
+  // TODO: move to finishFunction. And fill its body with tonns of asserts
+  bool hasCleanups = EHStack.stable_begin() != PrologueCleanupDepth;
+  if (hasCleanups)
+    PopCleanupBlocks(PrologueCleanupDepth);
 
   // Emit the standard function epilogue.
   // TODO: finishFunction(BodyRange.getEnd());
@@ -958,6 +963,7 @@ void CIRGenFunction::StartFunction(GlobalDecl GD, QualType RetTy,
   }
 
   // TODO: emitstartehspec
+  PrologueCleanupDepth = EHStack.stable_begin();
 
   // TODO: prologuecleanupdepth
 
