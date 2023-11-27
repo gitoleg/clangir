@@ -2286,27 +2286,51 @@ mlir::Value CIRGenFunction::buildOpOnBoolExpr(const Expr *cond,
 
 mlir::Value CIRGenFunction::buildAlloca(StringRef name, mlir::Type ty,
                                         mlir::Location loc, CharUnits alignment,
-                                        bool insertIntoFnEntryBlock) {
+                                        bool insertIntoFnEntryBlock,
+                                        mlir::Value arraySize) {
   mlir::Block *entryBlock = insertIntoFnEntryBlock
                                 ? getCurFunctionEntryBlock()
                                 : currLexScope->getEntryBlock();
   return buildAlloca(name, ty, loc, alignment,
-                     builder.getBestAllocaInsertPoint(entryBlock));
+                     builder.getBestAllocaInsertPoint(entryBlock), arraySize);
 }
 
 mlir::Value CIRGenFunction::buildAlloca(StringRef name, mlir::Type ty,
                                         mlir::Location loc, CharUnits alignment,
-                                        mlir::OpBuilder::InsertPoint ip) {
+                                        mlir::OpBuilder::InsertPoint ip,
+                                        mlir::Value arraySize) {
   auto localVarPtrTy = mlir::cir::PointerType::get(builder.getContext(), ty);
   auto alignIntAttr = CGM.getSize(alignment);
 
   mlir::Value addr;
   {
+    // TODO: I think it's a temp workaround. Probably I need to do something else
+    // and/or earlier - in order not to re-defing insertion point here
+    if (arraySize) {
+        auto op = arraySize.getDefiningOp();
+        auto block = op->getBlock(); // check, what the block is used earlier
+        auto iter =
+          std::find_if(block->rbegin(), block->rend(), [op](mlir::Operation &op1) {
+          return &op1 == op;
+        });
+
+      if (iter != block->rend()) {
+        ip = mlir::OpBuilder::InsertPoint(block,
+                                    ++mlir::Block::iterator(&*iter));
+      }
+    }
+
     mlir::OpBuilder::InsertionGuard guard(builder);
     builder.restoreInsertionPoint(ip);
+
+    if (!arraySize)
+      arraySize = builder.getUInt32(1, loc);
+
     addr = builder.create<mlir::cir::AllocaOp>(loc, /*addr type*/ localVarPtrTy,
                                                /*var type*/ ty, name,
-                                               alignIntAttr);
+                                               alignIntAttr,
+                                               arraySize);
+
     if (currVarDecl) {
       auto alloca = cast<mlir::cir::AllocaOp>(addr.getDefiningOp());
       alloca.setAstAttr(ASTVarDeclAttr::get(builder.getContext(), currVarDecl));
@@ -2317,9 +2341,10 @@ mlir::Value CIRGenFunction::buildAlloca(StringRef name, mlir::Type ty,
 
 mlir::Value CIRGenFunction::buildAlloca(StringRef name, QualType ty,
                                         mlir::Location loc, CharUnits alignment,
-                                        bool insertIntoFnEntryBlock) {
+                                        bool insertIntoFnEntryBlock,
+                                        mlir::Value arraySize) {
   return buildAlloca(name, getCIRType(ty), loc, alignment,
-                     insertIntoFnEntryBlock);
+                     insertIntoFnEntryBlock, arraySize);
 }
 
 mlir::Value CIRGenFunction::buildLoadOfScalar(LValue lvalue,
@@ -2502,10 +2527,8 @@ mlir::cir::AllocaOp
 CIRGenFunction::CreateTempAlloca(mlir::Type Ty, mlir::Location Loc,
                                  const Twine &Name, mlir::Value ArraySize,
                                  bool insertIntoFnEntryBlock) {
-  if (ArraySize)
-    assert(0 && "NYI");
   return cast<mlir::cir::AllocaOp>(
-      buildAlloca(Name.str(), Ty, Loc, CharUnits(), insertIntoFnEntryBlock)
+      buildAlloca(Name.str(), Ty, Loc, CharUnits(), insertIntoFnEntryBlock, ArraySize)
           .getDefiningOp());
 }
 
