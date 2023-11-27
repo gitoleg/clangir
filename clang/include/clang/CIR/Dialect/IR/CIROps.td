@@ -312,9 +312,12 @@ def AllocaOp : CIR_Op<"alloca", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<(ins "Type":$addr, "Type":$allocaType,
+    OpBuilder<(ins "Type":$addr,
+                   "Type":$allocaType,
                    "StringRef":$name,
-                   "IntegerAttr":$alignment)>
+                   "IntegerAttr":$alignment,
+                   "Value":$arraySize
+                   )>
   ];
 
   let extraClassDeclaration = [{
