@@ -420,13 +420,16 @@ public:
   // FIXME(cir): move this to CIRGenBuider.h
   mlir::Value buildAlloca(llvm::StringRef name, clang::QualType ty,
                           mlir::Location loc, clang::CharUnits alignment,
-                          bool insertIntoFnEntryBlock = false);
+                          bool insertIntoFnEntryBlock = false,
+                          mlir::Value arraySize = nullptr);
   mlir::Value buildAlloca(llvm::StringRef name, mlir::Type ty,
                           mlir::Location loc, clang::CharUnits alignment,
-                          bool insertIntoFnEntryBlock = false);
+                          bool insertIntoFnEntryBlock = false,
+                          mlir::Value arraySize = nullptr);
   mlir::Value buildAlloca(llvm::StringRef name, mlir::Type ty,
                           mlir::Location loc, clang::CharUnits alignment,
-                          mlir::OpBuilder::InsertPoint ip);
+                          mlir::OpBuilder::InsertPoint ip,
+                          mlir::Value arraySize = nullptr);
 
 private:
   void buildAndUpdateRetAlloca(clang::QualType ty, mlir::Location loc,
