@@ -2408,9 +2408,6 @@ mlir::Value CIRGenFunction::buildAlloca(StringRef name, mlir::Type ty,
     mlir::OpBuilder::InsertionGuard guard(builder);
     builder.restoreInsertionPoint(ip);
 
-    if (!arraySize)
-      arraySize = builder.getUInt32(1, loc);
-
     addr = builder.create<mlir::cir::AllocaOp>(loc, /*addr type*/ localVarPtrTy,
                                                /*var type*/ ty, name,
                                                alignIntAttr,

@@ -155,12 +155,7 @@ static RetTy parseOptionalCIRKeyword(AsmParser &parser, EnumTy defaultValue) {
 void AllocaOp::build(::mlir::OpBuilder &odsBuilder,
                      ::mlir::OperationState &odsState, ::mlir::Type addr,
                      ::mlir::Type allocaType, ::llvm::StringRef name,
-                     ::mlir::IntegerAttr alignment,
-                     ::mlir::Value arraySize
-                       ) {
-  if (arraySize)
-     odsState.addOperands(arraySize);
-
+                     ::mlir::IntegerAttr alignment) {
   odsState.addAttribute(getAllocaTypeAttrName(odsState.name),
                         ::mlir::TypeAttr::get(allocaType));
   odsState.addAttribute(getNameAttrName(odsState.name),

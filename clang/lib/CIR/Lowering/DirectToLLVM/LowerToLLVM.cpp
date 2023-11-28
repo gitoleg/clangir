@@ -898,6 +898,10 @@ public:
   matchAndRewrite(mlir::cir::AllocaOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     mlir::Value size = adaptor.getArraySize();
+    if (!size)
+      size = rewriter.create<mlir::LLVM::ConstantOp>(
+        op.getLoc(), typeConverter->convertType(rewriter.getIndexType()),
+        rewriter.getIntegerAttr(rewriter.getIndexType(), 1));
     auto elementTy = getTypeConverter()->convertType(op.getAllocaType());
     auto resultTy = mlir::LLVM::LLVMPointerType::get(getContext());
     rewriter.replaceOpWithNewOp<mlir::LLVM::AllocaOp>(
