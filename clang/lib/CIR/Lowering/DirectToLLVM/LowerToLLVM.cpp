@@ -1976,7 +1976,7 @@ public:
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto converter = getTypeConverter();
     auto typ = converter->convertType(op.getType());
-    rewriter.create<mlir::LLVM::StackSaveOp>(op.getLoc(), typ);
+    rewriter.replaceOpWithNewOp<mlir::LLVM::StackSaveOp>(op, typ);
     return mlir::success();
   }
 };
@@ -1989,6 +1989,7 @@ public:
   matchAndRewrite(mlir::cir::StackRestoreOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
 
+    rewriter.replaceOpWithNewOp<mlir::LLVM::StackRestoreOp>(op, adaptor.getPtr());
     return mlir::success();
   }
 };
