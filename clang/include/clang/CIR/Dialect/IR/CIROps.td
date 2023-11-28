@@ -336,8 +336,8 @@ def AllocaOp : CIR_Op<"alloca", [
   // FIXME: we should not be printing `cir.ptr` below, that should come
   // from the pointer type directly.
   let assemblyFormat = [{
-    $allocaType `,` `cir.ptr` type($addr) `,` 
-    ($arraySize^ `:` type($arraySize) `,`)? 
+    $allocaType `,` `cir.ptr` type($addr) `,`
+    ($arraySize^ `:` type($arraySize) `,`)?
     `[` $name
        (`,` `init` $init^)?
     `]`
