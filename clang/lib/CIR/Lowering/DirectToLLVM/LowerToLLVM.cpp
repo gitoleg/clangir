@@ -1960,6 +1960,33 @@ public:
   }
 };
 
+class CIRStackSaveLowering : public mlir::OpConversionPattern<mlir::cir::StackSaveOp> {
+public:
+  using OpConversionPattern<mlir::cir::StackSaveOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::cir::StackSaveOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto converter = getTypeConverter();
+    auto typ = converter->convertType(op.getType());
+    rewriter.replaceOpWithNewOp<mlir::LLVM::StackSaveOp>(op, typ);
+    return mlir::success();
+  }
+};
+
+class CIRStackRestoreLowering : public mlir::OpConversionPattern<mlir::cir::StackRestoreOp> {
+public:
+  using OpConversionPattern<mlir::cir::StackRestoreOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::cir::StackRestoreOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+
+    rewriter.replaceOpWithNewOp<mlir::LLVM::StackRestoreOp>(op, adaptor.getPtr());
+    return mlir::success();
+  }
+};
+
 void populateCIRToLLVMConversionPatterns(mlir::RewritePatternSet &patterns,
                                          mlir::TypeConverter &converter) {
   patterns.add<CIRReturnLowering>(patterns.getContext());
@@ -1973,7 +2000,8 @@ void populateCIRToLLVMConversionPatterns(mlir::RewritePatternSet &patterns,
                CIRVAArgLowering, CIRBrOpLowering, CIRTernaryOpLowering,
                CIRGetMemberOpLowering, CIRSwitchOpLowering,
                CIRPtrDiffOpLowering, CIRCopyOpLowering, CIRMemCpyOpLowering,
-               CIRFAbsOpLowering, CIRVTableAddrPointOpLowering>(
+               CIRFAbsOpLowering, CIRVTableAddrPointOpLowering,
+               CIRStackSaveLowering, CIRStackRestoreLowering>(
       converter, patterns.getContext());
 }
 
