@@ -516,7 +516,7 @@ CIRGenFunction::generateCode(clang::GlobalDecl GD, mlir::cir::FuncOp Fn,
   mlir::Block *EntryBB = Fn.addEntryBlock();
   builder.setInsertionPointToStart(EntryBB);
 
-  //{
+  {
     LexicalScope lexScope{*this, fusedLoc, EntryBB};
 
     // Emit the standard function prologue.
@@ -558,7 +558,7 @@ CIRGenFunction::generateCode(clang::GlobalDecl GD, mlir::cir::FuncOp Fn,
       llvm_unreachable("no definition for emitted function");
 
     assert(builder.getInsertionBlock() && "Should be valid");
-  //}
+  }
 
   if (mlir::failed(Fn.verifyBody()))
     return nullptr;
@@ -586,11 +586,6 @@ CIRGenFunction::generateCode(clang::GlobalDecl GD, mlir::cir::FuncOp Fn,
       builder.clearInsertionPoint();
     }
   }
-
-  // TODO: move to finishFunction. And fill its body with tonns of asserts
-  bool hasCleanups = EHStack.stable_begin() != PrologueCleanupDepth;
-  if (hasCleanups)
-    PopCleanupBlocks(PrologueCleanupDepth);
 
   // Emit the standard function epilogue.
   // TODO: finishFunction(BodyRange.getEnd());

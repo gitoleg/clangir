@@ -736,6 +736,8 @@ module {
   }
 }
 
+// -----
+
 !u8i = !cir.int<u, 8>
 module {
   cir.func @stack_save_type_mismatch() {
