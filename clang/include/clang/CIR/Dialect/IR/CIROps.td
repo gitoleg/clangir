@@ -284,6 +284,10 @@ def AllocaOp : CIR_Op<"alloca", [
     cases, the first use contains the initialization (a cir.store, a cir.call
     to a ctor, etc).
 
+    The `dynAllocSize` specifies the size to dynamically allocate on the stack
+    and ignores the allocation size based on the original type. This is useful
+    when handling VLAs and is omitted when declaring regular local variables.
+
     The result type is a pointer to the input's type.
 
     Example:
@@ -299,7 +303,7 @@ def AllocaOp : CIR_Op<"alloca", [
   }];
 
   let arguments = (ins
-    Optional<CIR_IntType>:$arraySize,
+    Optional<CIR_IntType>:$dynAllocSize,
     TypeAttr:$allocaType,
     StrAttr:$name,
     UnitAttr:$init,
@@ -316,6 +320,7 @@ def AllocaOp : CIR_Op<"alloca", [
                    "Type":$allocaType,
                    "StringRef":$name,
                    "IntegerAttr":$alignment)>,
+
     OpBuilder<(ins "Type":$addr,
                    "Type":$allocaType,
                    "StringRef":$name,
@@ -331,13 +336,15 @@ def AllocaOp : CIR_Op<"alloca", [
   let extraClassDeclaration = [{
     // Whether the alloca input type is a pointer.
     bool isPointerType() { return getAllocaType().isa<::mlir::cir::PointerType>(); }
+
+    bool isDynamic() { return (bool)getDynAllocSize(); }
   }];
 
   // FIXME: we should not be printing `cir.ptr` below, that should come
   // from the pointer type directly.
   let assemblyFormat = [{
     $allocaType `,` `cir.ptr` type($addr) `,`
-    ($arraySize^ `:` type($arraySize) `,`)?
+    ($dynAllocSize^ `:` type($dynAllocSize) `,`)?
     `[` $name
        (`,` `init` $init^)?
     `]`
@@ -1427,6 +1434,154 @@ def VTableAddrPointOp : CIR_Op<"vtable.address_point",
   }];
 
   let hasVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// SetBitfieldOp
+//===----------------------------------------------------------------------===//
+
+def SetBitfieldOp : CIR_Op<"set_bitfield"> {
+  let summary = "Set a bitfield";
+  let description = [{ 
+    The `cir.set_bitfield` operation provides a store-like access to 
+    a bit field of a record.
+
+    It expects an address of a storage where to store, a type of the storage,
+    a value being stored, a name of a bit field, a pointer to the storage in the
+    base record, a size of the storage, a size the bit field, an offset 
+    of the bit field and a sign. Returns a value being stored.
+
+    Example.
+    Suppose we have a struct with multiple bitfields stored in
+    different storages. The `cir.set_bitfield` operation sets the value
+    of the bitfield.
+    ```C++
+    typedef struct {
+      int a : 4;
+      int b : 27;
+      int c : 17;
+      int d : 2;
+      int e : 15;
+    } S;
+
+    void store_bitfield(S& s) {
+      s.d = 3;
+    }
+    ```
+
+    ```mlir
+    // 'd' is in the storage with the index 1
+    !struct_type = !cir.struct<struct "S" {!cir.int<u, 32>, !cir.int<u, 32>, !cir.int<u, 16>} #cir.record.decl.ast>
+    #bfi_d = #cir.bitfield_info<name = "d", storage_type = !u32i, size = 2, offset = 17, is_signed = true>
+
+    %1 = cir.const(#cir.int<3> : !s32i) : !s32i
+    %2 = cir.load %0 : cir.ptr <!cir.ptr<!struct_type>>, !cir.ptr<!struct_type>
+    %3 = cir.get_member %2[1] {name = "d"} : !cir.ptr<!struct_type> -> !cir.ptr<!u32i>
+    %4 = cir.set_bitfield(#bfi_d, %3 : !cir.ptr<!u32i>, %1 : !s32i) -> !s32i
+    ```
+   }];
+
+  let arguments = (ins
+    AnyType:$dst,
+    AnyType:$src,
+    BitfieldInfoAttr:$bitfield_info
+  );
+
+  let results = (outs CIR_IntType:$result);
+
+  let assemblyFormat = [{ `(`$bitfield_info`,` $dst`:`type($dst)`,`
+    $src`:`type($src) `)`  attr-dict `->` type($result) }];
+  
+  let builders = [
+    OpBuilder<(ins "Type":$type,
+                   "Value":$dst,
+                   "Type":$storage_type,
+                   "Value":$src,
+                   "StringRef":$name,
+                   "unsigned":$size, 
+                   "unsigned":$offset,
+                   "bool":$is_signed
+                   ),
+   [{      
+      BitfieldInfoAttr info = 
+        BitfieldInfoAttr::get($_builder.getContext(), 
+                              name, storage_type,
+                              size, offset, is_signed);
+      build($_builder, $_state, type, dst, src, info);
+    }]>
+  ];
+}
+
+//===----------------------------------------------------------------------===//
+// GetBitfieldOp
+//===----------------------------------------------------------------------===//
+
+def GetBitfieldOp : CIR_Op<"get_bitfield"> {
+  let summary = "Get a bitfield";
+  let description = [{ 
+    The `cir.get_bitfield` operation provides a load-like access to
+    a bit field of a record.
+
+    It expects a name if a bit field, a pointer to a storage in the
+    base record, a type of the storage, a name of the bitfield,
+    a size the bit field, an offset of the bit field and a sign.
+
+    Example:
+    Suppose we have a struct with multiple bitfields stored in
+    different storages. The `cir.get_bitfield` operation gets the value
+    of the bitfield
+    ```C++
+    typedef struct {
+      int a : 4;
+      int b : 27;
+      int c : 17;
+      int d : 2;
+      int e : 15;
+    } S;
+
+    int load_bitfield(S& s) {
+      return s.d;
+    }
+    ```
+
+    ```mlir
+    // 'd' is in the storage with the index 1
+    !struct_type = !cir.struct<struct "S" {!cir.int<u, 32>, !cir.int<u, 32>, !cir.int<u, 16>} #cir.record.decl.ast>
+    #bfi_d = #cir.bitfield_info<name = "d", storage_type = !u32i, size = 2, offset = 17, is_signed = true>
+
+    %2 = cir.load %0 : cir.ptr <!cir.ptr<!struct_type>>, !cir.ptr<!struct_type>
+    %3 = cir.get_member %2[1] {name = "d"} : !cir.ptr<!struct_type> -> !cir.ptr<!u32i>
+    %4 = cir.get_bitfield(#bfi_d, %3 : !cir.ptr<!u32i>) -> !s32i
+    ```
+    }];
+
+  let arguments = (ins
+    AnyType:$addr,    
+    BitfieldInfoAttr:$bitfield_info
+    );
+
+  let results = (outs CIR_IntType:$result);
+
+  let assemblyFormat = [{ `(`$bitfield_info `,` $addr attr-dict `:` 
+   type($addr) `)` `->` type($result) }];
+
+  let builders = [
+    OpBuilder<(ins "Type":$type,
+                   "Value":$addr,
+                   "Type":$storage_type,
+                   "StringRef":$name,
+                   "unsigned":$size,
+                   "unsigned":$offset,
+                   "bool":$is_signed
+                   ),
+   [{
+      BitfieldInfoAttr info = 
+        BitfieldInfoAttr::get($_builder.getContext(), 
+                              name, storage_type,
+                              size, offset, is_signed);
+      build($_builder, $_state, type, addr, info);
+    }]>
+  ];
 }
 
 //===----------------------------------------------------------------------===//
