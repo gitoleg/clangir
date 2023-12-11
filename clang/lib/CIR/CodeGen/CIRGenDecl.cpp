@@ -151,8 +151,6 @@ CIRGenFunction::buildAutoVarAlloca(const VarDecl &D) {
       assert(!UnimplementedFeature::shouldEmitLifetimeMarkers());
     }
   } else { // not openmp nor constant sized type
-  // TODO: THINK Here!
-  //  EnsureInsertPoint();
 
     if (getLangOpts().OpenMPIsTargetDevice) 
       llvm_unreachable("NYI");

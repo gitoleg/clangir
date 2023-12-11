@@ -1427,9 +1427,6 @@ void CIRGenFunction::buildVariablyModifiedType(QualType type) {
   assert(type->isVariablyModifiedType() &&
          "Must pass variably modified type to EmitVLASizes!");
 
-//TODO:FIX IT
-//  EnsureInsertPoint(); 
-
   // We're going to walk down into the type and look for VLA
   // expressions.
   do {
