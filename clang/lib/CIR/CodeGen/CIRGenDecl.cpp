@@ -9,7 +9,7 @@
 // This contains code to emit Decl nodes as CIR code.
 //
 //===----------------------------------------------------------------------===//
-#include <iostream>
+
 #include "CIRDataLayout.h"
 #include "CIRGenBuilder.h"
 #include "CIRGenCstEmitter.h"
@@ -39,7 +39,6 @@ CIRGenFunction::buildAutoVarAlloca(const VarDecl &D) {
   assert(!UnimplementedFeature::openCL());
   assert(!UnimplementedFeature::openMP());
   assert(Ty.getAddressSpace() == LangAS::Default);
-//  assert(!Ty->isVariablyModifiedType() && "not implemented");
   assert(!getContext()
               .getLangOpts()
               .OpenMP && // !CGF.getLangOpts().OpenMPIRBuilder
