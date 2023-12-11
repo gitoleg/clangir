@@ -1416,8 +1416,6 @@ CIRGenFunction::getVLASize(const VariableArrayType *type) {
       // It's undefined behavior if this wraps around, so mark it that way.
       // FIXME: Teach -fsanitize=undefined to trap this.
 
-      // TODO: THINK HERE!!
-      //numElements = Builder.CreateNUWMul(numElements, vlaSize);
       numElements = builder.createMul(numElements, vlaSize);
     }
   } while ((type = getContext().getAsVariableArrayType(elementType)));

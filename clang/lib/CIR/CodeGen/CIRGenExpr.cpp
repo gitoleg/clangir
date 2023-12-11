@@ -1173,22 +1173,19 @@ Address CIRGenFunction::buildArrayToPointerDecay(const Expr *E,
   auto lvalueAddrTy =
       Addr.getPointer().getType().dyn_cast<mlir::cir::PointerType>();
   assert(lvalueAddrTy && "expected pointer");
-
-  // TODO: TMP, there is an assertion bellow, where we fail on, Think here
-  if (E->getType()->isVariableArrayType())
-    return Addr;
-
   auto pointeeTy = lvalueAddrTy.getPointee().dyn_cast<mlir::cir::ArrayType>();
+
+  if (E->getType()->isVariableArrayType()) {
+    assert(!pointeeTy && "array is not expected");
+    return Addr;
+  }
+  
   assert(pointeeTy && "expected array");
 
   mlir::Type arrayTy = convertType(E->getType());
   assert(arrayTy.isa<mlir::cir::ArrayType>() && "expected array");
   assert(pointeeTy == arrayTy);
-
-  // TODO(cir): in LLVM codegen VLA pointers are always decayed, so we don't
-  // need to do anything here. Revisit this for VAT when its supported in CIR.
-  assert(!E->getType()->isVariableArrayType() && "what now?");
-
+  
   // The result of this decay conversion points to an array element within the
   // base lvalue. However, since TBAA currently does not support representing
   // accesses to elements of member arrays, we conservatively represent accesses
