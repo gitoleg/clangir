@@ -179,7 +179,7 @@ CIRGenFunction::buildAutoVarAlloca(const VarDecl &D) {
 
     // Allocate memory for the array.
     address = CreateTempAlloca(mTy, alignment, loc, "vla", VlaSize.NumElts,
-                                 &allocaAddr);
+                                 &allocaAddr, builder.saveInsertionPoint());
   }
 
   emission.Addr = address;
