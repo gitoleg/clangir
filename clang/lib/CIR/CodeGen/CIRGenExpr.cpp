@@ -2308,19 +2308,19 @@ mlir::Value CIRGenFunction::buildAlloca(StringRef name, mlir::Type ty,
   {
     // TODO: I think it's a temp workaround. Probably I need to do something else
     // and/or earlier - in order not to re-defing insertion point here
-    if (arraySize) {
-        auto op = arraySize.getDefiningOp();
-        auto block = op->getBlock(); // check, what the block is used earlier
-        auto iter =
-          std::find_if(block->rbegin(), block->rend(), [op](mlir::Operation &op1) {
-          return &op1 == op;
-        });
+    // if (arraySize) {
+    //     auto op = arraySize.getDefiningOp();
+    //     auto block = op->getBlock(); // check, what the block is used earlier
+    //     auto iter =
+    //       std::find_if(block->rbegin(), block->rend(), [op](mlir::Operation &op1) {
+    //       return &op1 == op;
+    //     });
 
-      if (iter != block->rend()) {
-        ip = mlir::OpBuilder::InsertPoint(block,
-                                    ++mlir::Block::iterator(&*iter));
-      }
-    }
+    //   if (iter != block->rend()) {
+    //     ip = mlir::OpBuilder::InsertPoint(block,
+    //                                 ++mlir::Block::iterator(&*iter));
+    //   }
+    // }
 
     mlir::OpBuilder::InsertionGuard guard(builder);
     builder.restoreInsertionPoint(ip);
@@ -2497,8 +2497,11 @@ Address CIRGenFunction::CreateTempAllocaWithoutCast(mlir::Type Ty,
                                                     CharUnits Align,
                                                     mlir::Location Loc,
                                                     const Twine &Name,
-                                                    mlir::Value ArraySize) {
-  auto Alloca = CreateTempAlloca(Ty, Loc, Name, ArraySize);
+                                                    mlir::Value ArraySize,
+                                                    mlir::OpBuilder::InsertPoint ip) {
+  auto Alloca = ip.isSet() 
+                ? CreateTempAlloca(Ty, Loc, Name, ip, ArraySize)
+                : CreateTempAlloca(Ty, Loc, Name, ArraySize);
   Alloca.setAlignmentAttr(CGM.getSize(Align));
   return Address(Alloca, Ty, Align);
 }
@@ -2508,8 +2511,9 @@ Address CIRGenFunction::CreateTempAllocaWithoutCast(mlir::Type Ty,
 Address CIRGenFunction::CreateTempAlloca(mlir::Type Ty, CharUnits Align,
                                          mlir::Location Loc, const Twine &Name,
                                          mlir::Value ArraySize,
-                                         Address *AllocaAddr) {
-  auto Alloca = CreateTempAllocaWithoutCast(Ty, Align, Loc, Name, ArraySize);
+                                         Address *AllocaAddr,
+                                         mlir::OpBuilder::InsertPoint ip) {
+  auto Alloca = CreateTempAllocaWithoutCast(Ty, Align, Loc, Name, ArraySize, ip);
   if (AllocaAddr)
     *AllocaAddr = Alloca;
   mlir::Value V = Alloca.getPointer();
@@ -2521,6 +2525,7 @@ Address CIRGenFunction::CreateTempAlloca(mlir::Type Ty, CharUnits Align,
   return Address(V, Ty, Align);
 }
 
+// TODO: CHECK the doc string
 /// This creates an alloca and inserts it into the entry block if \p ArraySize
 /// is nullptr, otherwise inserts it at the current insertion point of the
 /// builder.
@@ -2530,6 +2535,18 @@ CIRGenFunction::CreateTempAlloca(mlir::Type Ty, mlir::Location Loc,
                                  bool insertIntoFnEntryBlock) {
   return cast<mlir::cir::AllocaOp>(
       buildAlloca(Name.str(), Ty, Loc, CharUnits(), insertIntoFnEntryBlock, ArraySize)
+          .getDefiningOp());
+}
+
+/// This creates an alloca and inserts it into the provided insertion point
+mlir::cir::AllocaOp
+CIRGenFunction::CreateTempAlloca(mlir::Type Ty, mlir::Location Loc,
+                                 const Twine &Name, 
+                                 mlir::OpBuilder::InsertPoint ip,
+                                 mlir::Value ArraySize) {
+  assert(ip.isSet() && "Insertion point is not set");
+  return cast<mlir::cir::AllocaOp>(
+      buildAlloca(Name.str(), Ty, Loc, CharUnits(), ip, ArraySize)
           .getDefiningOp());
 }
 

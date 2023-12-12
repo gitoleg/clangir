@@ -1908,14 +1908,20 @@ public:
   CreateTempAllocaInFnEntryBlock(mlir::Type Ty, mlir::Location Loc,
                                  const Twine &Name = "tmp",
                                  mlir::Value ArraySize = nullptr);
+  mlir::cir::AllocaOp CreateTempAlloca(mlir::Type Ty, mlir::Location Loc,
+                                       const Twine &Name = "tmp",
+                                       mlir::OpBuilder::InsertPoint ip = {},
+                                       mlir::Value ArraySize = nullptr);
   Address CreateTempAlloca(mlir::Type Ty, CharUnits align, mlir::Location Loc,
                            const Twine &Name = "tmp",
                            mlir::Value ArraySize = nullptr,
-                           Address *Alloca = nullptr);
+                           Address *Alloca = nullptr,
+                           mlir::OpBuilder::InsertPoint ip = {});
   Address CreateTempAllocaWithoutCast(mlir::Type Ty, CharUnits align,
                                       mlir::Location Loc,
                                       const Twine &Name = "tmp",
-                                      mlir::Value ArraySize = nullptr);
+                                      mlir::Value ArraySize = nullptr,
+                                      mlir::OpBuilder::InsertPoint ip = {});
 
   /// Create a temporary memory object of the given type, with
   /// appropriate alignmen and cast it to the default address space. Returns
