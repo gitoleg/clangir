@@ -2259,7 +2259,24 @@ mlir::Value ScalarExprEmitter::VisitUnaryExprOrTypeTraitExpr(
   if (E->getKind() == UETT_SizeOf) {
     if (const VariableArrayType *VAT =
             CGF.getContext().getAsVariableArrayType(TypeToSize)) {
-      llvm_unreachable("NYI");
+      if (E->isArgumentType()) {
+        // sizeof(type) - make sure to emit the VLA size.
+        CGF.buildVariablyModifiedType(TypeToSize);
+      } else {
+        // C99 6.5.3.4p2: If the argument is an expression of type
+        // VLA, it is evaluated.
+        CGF.buildIgnoredExpr(E->getArgumentExpr());
+      }
+
+      auto VlaSize = CGF.getVLASize(VAT);
+      mlir::Value size = VlaSize.NumElts;
+
+      // Scale the number of non-VLA elements by the non-VLA element size.
+      CharUnits eltSize = CGF.getContext().getTypeSizeInChars(VlaSize.Type);
+      if (!eltSize.isOne())
+        size = Builder.createMul(size, CGF.CGM.getSize(eltSize).getValue());
+
+      return size;
     }
   } else if (E->getKind() == UETT_OpenMPRequiredSimdAlign) {
     llvm_unreachable("NYI");
