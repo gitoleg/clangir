@@ -2305,22 +2305,6 @@ mlir::Value CIRGenFunction::buildAlloca(StringRef name, mlir::Type ty,
 
   mlir::Value addr;
   {
-    // TODO: I think it's a temp workaround. Probably I need to do something else
-    // and/or earlier - in order not to re-defing insertion point here
-    // if (arraySize) {
-    //     auto op = arraySize.getDefiningOp();
-    //     auto block = op->getBlock(); // check, what the block is used earlier
-    //     auto iter =
-    //       std::find_if(block->rbegin(), block->rend(), [op](mlir::Operation &op1) {
-    //       return &op1 == op;
-    //     });
-
-    //   if (iter != block->rend()) {
-    //     ip = mlir::OpBuilder::InsertPoint(block,
-    //                                 ++mlir::Block::iterator(&*iter));
-    //   }
-    // }
-
     mlir::OpBuilder::InsertionGuard guard(builder);
     builder.restoreInsertionPoint(ip);
 
