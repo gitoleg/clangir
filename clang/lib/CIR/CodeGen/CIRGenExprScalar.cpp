@@ -1098,8 +1098,31 @@ static mlir::Value buildPointerArithmetic(CIRGenFunction &CGF,
 
   QualType elementType = pointerType->getPointeeType();
   if (const VariableArrayType *vla =
-          CGF.getContext().getAsVariableArrayType(elementType))
-    llvm_unreachable("VLA pointer arithmetic is NYI");
+          CGF.getContext().getAsVariableArrayType(elementType)) {
+
+    // The element count here is the total number of non-VLA elements.
+    mlir::Value numElements = CGF.getVLASize(vla).NumElts;
+
+    // Effectively, the multiply by the VLA size is part of the GEP.
+    // GEP indexes are signed, and scaling an index isn't permitted to
+    // signed-overflow, so we use the same semantics for our explicit
+    // multiply.  We suppress this if overflow is not undefined behavior.
+    mlir::Type elemTy = CGF.convertTypeForMem(vla->getElementType());
+
+    index = CGF.getBuilder().createCast(mlir::cir::CastKind::integral, 
+                                        index, numElements.getType());
+    index = CGF.getBuilder().createMul(index, numElements);
+
+    if (CGF.getLangOpts().isSignedOverflowDefined()) {
+      pointer = CGF.getBuilder().create<mlir::cir::PtrStrideOp>(
+                    CGF.getLoc(op.E->getExprLoc()), pointer.getType(),
+                    pointer, index);
+    } else {      
+      pointer = CGF.buildCheckedInBoundsGEP(
+          elemTy, pointer, index, isSigned, isSubtraction, op.E->getExprLoc());
+    }
+    return pointer;
+  }
 
   // Explicitly handle GNU void* and function pointer arithmetic extensions. The
   // GNU void* casts amount to no-ops since our void* type is i8*, but this is

@@ -104,53 +104,8 @@ double f8(int n, double (*p)[n][5]) {
     return p[1][2][3];
 }
 
-// int test4(unsigned n, char (*p)[n][n+1][6]) {
-//     __typeof(p) p2 = (p + n/2) - n/4;
+int f9(unsigned n, char (*p)[n][n+1][6]) {
+    __typeof(p) p2 = (p + n/2) - n/4;
 
-//   return p2 - p;
-// }
-
-// void test5(void)
-// {
-
-//   int a[5], i = 0;
-//   (typeof(++i, (int (*)[i])a)){&a} += 0;
-  
-// }
-
-// void test6(void)
-// {
-  
-//   int n = 20, **a, i=0;
-  
-//  (int (**)[i]){&a}[0][1][5] = 0;
-
-// }
-
-// // Follow gcc's behavior for VLAs in parameter lists.  PR9559.
-// void test7(int a[b(0)]) {
-  
-// }
-
-// // Make sure we emit dereferenceable or nonnull when the static keyword is
-// // provided.
-// void test8(int a[static 3]) { }
-
-
-// void test9(int n, int a[static n]) { }
-
-// // Make sure a zero-sized static array extent is still required to be nonnull.
-// void test10(int a[static 0]) {}
-
-
-// const int constant = 32;
-
-// int pr44406(void) {
-//   int n = 0;
-//   // Do not fold this VLA to an array of constant bound; that would miscompile
-//   // this testcase.
-//   char c[1][(constant - constant) + 3];
-
-//   sizeof(c[n = 1]);
-//   return n;
-// }
+  return p2 - p;
+}
