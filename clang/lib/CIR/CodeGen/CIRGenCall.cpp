@@ -454,7 +454,8 @@ RValue CIRGenFunction::buildCall(const CIRGenFunctionInfo &CallInfo,
         // We might have to widen integers, but we should never truncate.
         if (ArgInfo.getCoerceToType() != V.getType() &&
             V.getType().isa<mlir::cir::IntType>())
-          llvm_unreachable("NYI");
+            V = builder.createCast(mlir::cir::CastKind::integral,  
+              V, ArgInfo.getCoerceToType());
 
         // If the argument doesn't match, perform a bitcast to coerce it. This
         // can happen due to trivial type mismatches.
