@@ -73,15 +73,25 @@ void f5(unsigned x) {
 // Check no errors happen
 void function1(short width, int data[][width]) {} 
 void function2(short width, int data[][width][width]) {}
-void test1(void) {
+void f6(void) {
      int bork[4][13][15];
 
      function1(1, bork[2]);
      function2(1, bork);    
 }
-
+/*
+%5 = cir.const(#cir.int<1> : !s32i) : !s32i loc(#loc119)
+%6 = cir.cast(integral, %5 : !s32i), !u64i
+%7 = cir.load %0 : cir.ptr <!s32i>, !s32i
+%8 = cir.const(#cir.int<3> : !s32i) : !s32i
+%9 = cir.binop(add, %7, %8) : !s32i
+%10 = cir.cast(integral, %9 : !s32i), !u64i
+%11 = cir.stack_save : <!u8i>
+%12 = cir.binop(mul, %6, %10) : !u64i
+%20 = cir.alloca !s8i, cir.ptr <!s8i>, %10 : !u64i, ["vla"] {alignment = 16 : i64}
+*/
 static int GLOB;
-int test2(int n)
+int f7(int n)
 {
   GLOB = 0;
   char b[1][n+3];
@@ -90,12 +100,9 @@ int test2(int n)
   return GLOB;
 }
 
-// // http://llvm.org/PR8567
-
-// double test_PR8567(int n, double (*p)[n][5]) {
-  
-//  return p[1][2][3];
-// }
+double f8(int n, double (*p)[n][5]) {
+    return p[1][2][3];
+}
 
 // int test4(unsigned n, char (*p)[n][n+1][6]) {
 //     __typeof(p) p2 = (p + n/2) - n/4;
