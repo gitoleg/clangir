@@ -2041,9 +2041,8 @@ public:
   mlir::LogicalResult
   matchAndRewrite(mlir::cir::StackSaveOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    auto converter = getTypeConverter();
-    auto typ = converter->convertType(op.getType());
-    rewriter.replaceOpWithNewOp<mlir::LLVM::StackSaveOp>(op, typ);
+    auto ptrTy = getTypeConverter()->convertType(op.getType());
+    rewriter.replaceOpWithNewOp<mlir::LLVM::StackSaveOp>(op, ptrTy);
     return mlir::success();
   }
 };
@@ -2055,8 +2054,9 @@ public:
   mlir::LogicalResult
   matchAndRewrite(mlir::cir::StackRestoreOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-
-    rewriter.replaceOpWithNewOp<mlir::LLVM::StackRestoreOp>(op, adaptor.getPtr());
+    rewriter.replaceOpWithNewOp<mlir::LLVM::StackRestoreOp>(
+        op,
+        adaptor.getPtr());
     return mlir::success();
   }
 };
