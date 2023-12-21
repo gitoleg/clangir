@@ -6,7 +6,7 @@
 // CHECK:    cir.store %arg0, [[TMP0]] : !s32i, cir.ptr <!s32i>
 // CHECK:    [[TMP2:%.*]] = cir.load [[TMP0]] : cir.ptr <!s32i>, !s32i
 // CHECK:    [[TMP3:%.*]] = cir.cast(integral, [[TMP2]] : !s32i), !u64i
-// CHECK:    [[TMP4:%.*]] = cir.stack_save : <!u8i>
+// CHECK:    [[TMP4:%.*]] = cir.stack_save : !cir.ptr<!u8i>
 // CHECK:    cir.store [[TMP4]], [[TMP1]] : !cir.ptr<!u8i>, cir.ptr <!cir.ptr<!u8i>>
 // CHECK:    [[TMP5:%.*]] = cir.alloca !s32i, cir.ptr <!s32i>, [[TMP3]] : !u64i, ["vla"] {alignment = 16 : i64}
 // CHECK:    [[TMP6:%.*]] = cir.load [[TMP1]] : cir.ptr <!cir.ptr<!u8i>>, !cir.ptr<!u8i>
@@ -55,10 +55,10 @@ void f4(int count) {
 }
 
 // CHECK: cir.func @f5
-// CHECK: {{.*}} = cir.stack_save : <!u8i> 
+// CHECK: {{.*}} = cir.stack_save : !cir.ptr<!u8i> 
 // CHECK: {{.*}} = cir.alloca !s8i, cir.ptr <!s8i>, {{%.*}}
 // CHECK: cir.loop while(cond : {
-// CHECK:     {{%.*}} = cir.stack_save : <!u8i> 
+// CHECK:     {{%.*}} = cir.stack_save : !cir.ptr<!u8i> 
 // CHECK:     cir.stack_restore {{%.*}} : !cir.ptr<!u8i> 
 // CHECK: cir.stack_restore {{%.*}} : !cir.ptr<!u8i> 
 void f5(unsigned x) {
@@ -86,7 +86,7 @@ void f6(void) {
 %8 = cir.const(#cir.int<3> : !s32i) : !s32i
 %9 = cir.binop(add, %7, %8) : !s32i
 %10 = cir.cast(integral, %9 : !s32i), !u64i
-%11 = cir.stack_save : <!u8i>
+%11 = cir.stack_save : !cir.ptr<!u8i>
 %12 = cir.binop(mul, %6, %10) : !u64i
 %20 = cir.alloca !s8i, cir.ptr <!s8i>, %10 : !u64i, ["vla"] {alignment = 16 : i64}
 */
