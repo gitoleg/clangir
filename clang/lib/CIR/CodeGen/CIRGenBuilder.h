@@ -175,7 +175,6 @@ public:
     llvm::SmallVector<mlir::Type, 8> members;
     auto structTy = type.dyn_cast<mlir::cir::StructType>();
     assert(structTy && "expected cir.struct");
-    assert(!packed && "unpacked struct is NYI");
 
     // Collect members and check if they are all zero.
     bool isZero = true;
@@ -200,7 +199,6 @@ public:
   mlir::cir::ConstStructAttr getAnonConstStruct(mlir::ArrayAttr arrayAttr,
                                                 bool packed = false,
                                                 mlir::Type ty = {}) {
-    assert(!packed && "NYI");
     llvm::SmallVector<mlir::Type, 4> members;
     for (auto &f : arrayAttr) {
       auto ta = f.dyn_cast<mlir::TypedAttr>();
@@ -219,6 +217,20 @@ public:
   mlir::cir::TypeInfoAttr getTypeInfo(mlir::ArrayAttr fieldsAttr) {
     auto anonStruct = getAnonConstStruct(fieldsAttr);
     return mlir::cir::TypeInfoAttr::get(anonStruct.getType(), fieldsAttr);
+  }
+
+  mlir::cir::CmpThreeWayInfoAttr getCmpThreeWayInfoStrongOrdering(
+      const llvm::APSInt &lt, const llvm::APSInt &eq, const llvm::APSInt &gt) {
+    return mlir::cir::CmpThreeWayInfoAttr::get(
+        getContext(), lt.getSExtValue(), eq.getSExtValue(), gt.getSExtValue());
+  }
+
+  mlir::cir::CmpThreeWayInfoAttr getCmpThreeWayInfoPartialOrdering(
+      const llvm::APSInt &lt, const llvm::APSInt &eq, const llvm::APSInt &gt,
+      const llvm::APSInt &unordered) {
+    return mlir::cir::CmpThreeWayInfoAttr::get(
+        getContext(), lt.getSExtValue(), eq.getSExtValue(), gt.getSExtValue(),
+        unordered.getSExtValue());
   }
 
   mlir::cir::DataMemberAttr getDataMemberAttr(mlir::cir::DataMemberType ty,
@@ -600,6 +612,11 @@ public:
     return create<mlir::cir::ContinueOp>(loc);
   }
 
+  mlir::cir::CmpOp createCompare(mlir::Location loc, mlir::cir::CmpOpKind kind,
+                                 mlir::Value lhs, mlir::Value rhs) {
+    return create<mlir::cir::CmpOp>(loc, getBoolTy(), kind, lhs, rhs);
+  }
+
   mlir::cir::MemCpyOp createMemCpy(mlir::Location loc, mlir::Value dst,
                                    mlir::Value src, mlir::Value len) {
     return create<mlir::cir::MemCpyOp>(loc, dst, src, len);
@@ -824,6 +841,35 @@ public:
     } else {
       alloca->moveAfter(*std::prev(allocas.end()));
     }
+  }
+
+  mlir::cir::CmpThreeWayOp
+  createThreeWayCmpStrong(mlir::Location loc, mlir::Value lhs, mlir::Value rhs,
+                          const llvm::APSInt &ltRes, const llvm::APSInt &eqRes,
+                          const llvm::APSInt &gtRes) {
+    assert(ltRes.getBitWidth() == eqRes.getBitWidth() &&
+           ltRes.getBitWidth() == gtRes.getBitWidth() &&
+           "the three comparison results must have the same bit width");
+    auto cmpResultTy = getSIntNTy(ltRes.getBitWidth());
+    auto infoAttr = getCmpThreeWayInfoStrongOrdering(ltRes, eqRes, gtRes);
+    return create<mlir::cir::CmpThreeWayOp>(loc, cmpResultTy, lhs, rhs,
+                                            infoAttr);
+  }
+
+  mlir::cir::CmpThreeWayOp
+  createThreeWayCmpPartial(mlir::Location loc, mlir::Value lhs, mlir::Value rhs,
+                           const llvm::APSInt &ltRes, const llvm::APSInt &eqRes,
+                           const llvm::APSInt &gtRes,
+                           const llvm::APSInt &unorderedRes) {
+    assert(ltRes.getBitWidth() == eqRes.getBitWidth() &&
+           ltRes.getBitWidth() == gtRes.getBitWidth() &&
+           ltRes.getBitWidth() == unorderedRes.getBitWidth() &&
+           "the four comparison results must have the same bit width");
+    auto cmpResultTy = getSIntNTy(ltRes.getBitWidth());
+    auto infoAttr =
+        getCmpThreeWayInfoPartialOrdering(ltRes, eqRes, gtRes, unorderedRes);
+    return create<mlir::cir::CmpThreeWayOp>(loc, cmpResultTy, lhs, rhs,
+                                            infoAttr);
   }
 
   mlir::cir::GetRuntimeMemberOp createGetIndirectMember(mlir::Location loc,

@@ -1148,6 +1148,55 @@ def BitPopcountOp : CIR_BitOp<"bit.popcount", UIntOfWidths<[16, 32, 64]>> {
 }
 
 //===----------------------------------------------------------------------===//
+// CmpThreeWayOp
+//===----------------------------------------------------------------------===//
+
+def CmpThreeWayOp : CIR_Op<"cmp3way", [Pure, SameTypeOperands]> {
+  let summary = "Compare two values with C++ three-way comparison semantics";
+  let description = [{
+    The `cir.cmp3way` operation models the `<=>` operator in C++20. It takes two
+    operands with the same type and produces a result indicating the ordering
+    between the two input operands.
+
+    The result of the operation is a signed integer that indicates the ordering
+    between the two input operands.
+
+    There are two kinds of ordering: strong ordering and partial ordering.
+    Comparing different types of values yields different kinds of orderings.
+    The `info` parameter gives the ordering kind and other necessary information
+    about the comparison.
+
+    Example:
+
+    ```mlir
+    !s32i = !cir.int<s, 32>
+
+    #cmp3way_strong = #cmp3way_info<strong, lt = -1, eq = 0, gt = 1>
+    #cmp3way_partial = #cmp3way_info<strong, lt = -1, eq = 0, gt = 1, unordered = 2>
+
+    %0 = cir.const(#cir.int<0> : !s32i) : !s32i
+    %1 = cir.const(#cir.int<1> : !s32i) : !s32i
+    %2 = cir.cmp3way(%0 : !s32i, %1, #cmp3way_strong) : !s8i
+
+    %3 = cir.const(#cir.fp<0.0> : !cir.float) : !cir.float
+    %4 = cir.const(#cir.fp<1.0> : !cir.float) : !cir.float
+    %5 = cir.cmp3way(%3 : !cir.float, %4, #cmp3way_partial) : !s8i
+    ```
+  }];
+
+  let results = (outs CIR_IntType:$result);
+  let arguments = (ins CIR_AnyType:$lhs, CIR_AnyType:$rhs,
+                       CmpThreeWayInfoAttr:$info);
+
+  let assemblyFormat = [{
+    `(` $lhs `:` type($lhs) `,` $rhs `,` qualified($info) `)`
+    `:` type($result) attr-dict
+  }];
+
+  let hasVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
 // SwitchOp
 //===----------------------------------------------------------------------===//
 
@@ -1759,7 +1808,7 @@ def SetBitfieldOp : CIR_Op<"set_bitfield"> {
    }];
 
   let arguments = (ins
-    CIR_PointerType:$dst,
+    Arg<CIR_PointerType, "the address to store the value", [MemWrite]>:$addr,
     CIR_AnyType:$src,
     BitfieldInfoAttr:$bitfield_info,
     UnitAttr:$is_volatile
@@ -1767,12 +1816,12 @@ def SetBitfieldOp : CIR_Op<"set_bitfield"> {
 
   let results = (outs CIR_IntType:$result);
 
-  let assemblyFormat = [{ `(`$bitfield_info`,` $dst`:`qualified(type($dst))`,`
+  let assemblyFormat = [{ `(`$bitfield_info`,` $addr`:`qualified(type($addr))`,`
     $src`:`type($src) `)`  attr-dict `->` type($result) }];
 
   let builders = [
     OpBuilder<(ins "Type":$type,
-                   "Value":$dst,
+                   "Value":$addr,
                    "Type":$storage_type,
                    "Value":$src,
                    "StringRef":$name,
@@ -1786,7 +1835,7 @@ def SetBitfieldOp : CIR_Op<"set_bitfield"> {
         BitfieldInfoAttr::get($_builder.getContext(),
                               name, storage_type,
                               size, offset, is_signed);
-      build($_builder, $_state, type, dst, src, info, is_volatile);
+      build($_builder, $_state, type, addr, src, info, is_volatile);
     }]>
   ];
 }
@@ -1838,7 +1887,7 @@ def GetBitfieldOp : CIR_Op<"get_bitfield"> {
     }];
 
   let arguments = (ins
-    CIR_PointerType:$addr,
+    Arg<CIR_PointerType, "the address to load from", [MemRead]>:$addr,
     BitfieldInfoAttr:$bitfield_info,
     UnitAttr:$is_volatile
     );
@@ -3206,6 +3255,41 @@ def TrapOp : CIR_Op<"trap", [Terminator]> {
 }
 
 //===----------------------------------------------------------------------===//
+// PrefetchOp
+//===----------------------------------------------------------------------===//
+
+def PrefetchOp : CIR_Op<"prefetch"> {
+  let summary = "prefetch operation";
+  let description = [{
+    The `cir.prefetch` op prefetches data from the memmory address.
+
+    ```mlir
+    cir.prefetch(%0 : !cir.ptr<!void>) locality(1) write
+    ```
+
+    This opcode has the three attributes:
+    1. The $locality is a temporal locality specifier
+    ranging from (0) - no locality, to (3) - extremely local keep in cache.
+    2. The $isWrite is the specifier determining if the prefetch is prepaired
+    for a 'read' or 'write'.
+    If $isWrite doesn't specified it means that prefetch is prepared for 'read'.
+  }];
+
+  let arguments = (
+    ins VoidPtr:$addr,
+        ConfinedAttr<I32Attr, [IntMinValue<0>,
+          IntMaxValue<3>]>:$locality,
+        UnitAttr:$isWrite);
+
+  let assemblyFormat = [{
+    `(` $addr `:` qualified(type($addr)) `)`
+        `locality``(` $locality `)`
+        (`write` $isWrite^) : (`read`)?
+        attr-dict
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // ArrayCtor & ArrayDtor
 //===----------------------------------------------------------------------===//
 
@@ -3245,6 +3329,23 @@ def ArrayDtor : CIR_ArrayInitDestroy<"array.dtor"> {
     Destroy each array element using the same C++ destructor. This
     operation has one region, with one single block. The block has an
     incoming argument for the current array index to initialize.
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// IsConstantOp
+//===----------------------------------------------------------------------===//
+
+def IsConstantOp : CIR_Op<"is_constant", [Pure]> {
+  let description = [{
+    Returns `true` if the argument is known to be a compile-time constant
+    otherwise returns 'false'.
+  }];
+  let arguments = (ins CIR_AnyType:$val);
+  let results = (outs CIR_BoolType:$result);
+
+  let assemblyFormat = [{
+    `(` $val `:` type($val) `)` `:` type($result) attr-dict
   }];
 }
 

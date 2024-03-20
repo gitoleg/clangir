@@ -2575,7 +2575,21 @@ class CIRInlineAsmOpLowering
         /*is_align_stack*/ mlir::UnitAttr(),
         mlir::LLVM::AsmDialectAttr::get(getContext(), llDialect),
         rewriter.getArrayAttr(opAttrs));
+    return mlir::success();
+  }
+};
 
+class CIRPrefetchLowering
+    : public mlir::OpConversionPattern<mlir::cir::PrefetchOp> {
+public:
+  using OpConversionPattern<mlir::cir::PrefetchOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::cir::PrefetchOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<mlir::LLVM::Prefetch>(
+        op, adaptor.getAddr(), adaptor.getIsWrite(), adaptor.getLocality(),
+        /*DataCache*/ 1);
     return mlir::success();
   }
 };
@@ -2616,7 +2630,7 @@ public:
       assert(storageSize > size && "Invalid bitfield size.");
 
       mlir::Value val = rewriter.create<mlir::LLVM::LoadOp>(
-          op.getLoc(), intType, adaptor.getDst(), /* alignment */ 0,
+          op.getLoc(), intType, adaptor.getAddr(), /* alignment */ 0,
           op.getIsVolatile());
 
       srcVal = createAnd(rewriter, srcVal,
@@ -2633,7 +2647,7 @@ public:
       srcVal = rewriter.create<mlir::LLVM::OrOp>(op.getLoc(), val, srcVal);
     }
 
-    rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), srcVal, adaptor.getDst(),
+    rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), srcVal, adaptor.getAddr(),
                                          /* alignment */ 0, op.getIsVolatile());
 
     auto resultTy = getTypeConverter()->convertType(op.getType());
@@ -2710,6 +2724,25 @@ public:
   }
 };
 
+class CIRIsConstantOpLowering
+    : public mlir::OpConversionPattern<mlir::cir::IsConstantOp> {
+
+  using mlir::OpConversionPattern<mlir::cir::IsConstantOp>::OpConversionPattern;
+
+  mlir::LogicalResult
+  matchAndRewrite(mlir::cir::IsConstantOp op, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    // FIXME(cir): llvm.intr.is.constant returns i1 value but the LLVM Lowering
+    // expects that cir.bool type will be lowered as i8 type.
+    // So we have to insert zext here.
+    auto isConstantOP = rewriter.create<mlir::LLVM::IsConstantOp>(
+        op.getLoc(), adaptor.getVal());
+    rewriter.replaceOpWithNewOp<mlir::LLVM::ZExtOp>(op, rewriter.getI8Type(),
+                                                    isConstantOP);
+    return mlir::success();
+  }
+};
+
 void populateCIRToLLVMConversionPatterns(mlir::RewritePatternSet &patterns,
                                          mlir::TypeConverter &converter) {
   patterns.add<CIRReturnLowering>(patterns.getContext());
@@ -2730,8 +2763,8 @@ void populateCIRToLLVMConversionPatterns(mlir::RewritePatternSet &patterns,
       CIRVectorExtractLowering, CIRVectorCmpOpLowering, CIRVectorSplatLowering,
       CIRVectorTernaryLowering, CIRStackSaveLowering, CIRStackRestoreLowering,
       CIRUnreachableLowering, CIRTrapLowering, CIRInlineAsmOpLowering,
-      CIRSetBitfieldLowering, CIRGetBitfieldLowering>(converter,
-                                                      patterns.getContext());
+      CIRSetBitfieldLowering, CIRGetBitfieldLowering, CIRPrefetchLowering,
+      CIRIsConstantOpLowering>(converter, patterns.getContext());
 }
 
 namespace {

@@ -439,6 +439,29 @@ RValue CIRGenFunction::buildBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
     return RValue::get(buildScalarExpr(E->getArg(0)));
   }
 
+  case Builtin::BI__builtin_prefetch: {
+    auto evaluateOperandAsInt = [&](const Expr *Arg) {
+      Expr::EvalResult Res;
+      [[maybe_unused]] bool EvalSucceed =
+          Arg->EvaluateAsInt(Res, CGM.getASTContext());
+      assert(EvalSucceed && "expression should be able to evaluate as int");
+      return Res.Val.getInt().getZExtValue();
+    };
+
+    bool IsWrite = false;
+    if (E->getNumArgs() > 1)
+      IsWrite = evaluateOperandAsInt(E->getArg(1));
+
+    int Locality = 0;
+    if (E->getNumArgs() > 2)
+      Locality = evaluateOperandAsInt(E->getArg(2));
+
+    mlir::Value Address = buildScalarExpr(E->getArg(0));
+    builder.create<mlir::cir::PrefetchOp>(getLoc(E->getSourceRange()), Address,
+                                          Locality, IsWrite);
+    return RValue::get(nullptr);
+  }
+
   // C++ std:: builtins.
   case Builtin::BImove:
   case Builtin::BImove_if_noexcept:
@@ -569,6 +592,42 @@ RValue CIRGenFunction::buildBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
   case Builtin::BI__builtin_popcountl:
   case Builtin::BI__builtin_popcountll:
     return buildBuiltinBitOp<mlir::cir::BitPopcountOp>(*this, E, std::nullopt);
+
+  case Builtin::BI__builtin_constant_p: {
+    mlir::Type ResultType = ConvertType(E->getType());
+
+    const Expr *Arg = E->getArg(0);
+    QualType ArgType = Arg->getType();
+    // FIXME: The allowance for Obj-C pointers and block pointers is historical
+    // and likely a mistake.
+    if (!ArgType->isIntegralOrEnumerationType() && !ArgType->isFloatingType() &&
+        !ArgType->isObjCObjectPointerType() && !ArgType->isBlockPointerType())
+      // Per the GCC documentation, only numeric constants are recognized after
+      // inlining.
+      return RValue::get(
+          builder.getConstInt(getLoc(E->getSourceRange()),
+                              ResultType.cast<mlir::cir::IntType>(), 0));
+
+    if (Arg->HasSideEffects(getContext()))
+      // The argument is unevaluated, so be conservative if it might have
+      // side-effects.
+      return RValue::get(
+          builder.getConstInt(getLoc(E->getSourceRange()),
+                              ResultType.cast<mlir::cir::IntType>(), 0));
+
+    mlir::Value ArgValue = buildScalarExpr(Arg);
+    if (ArgType->isObjCObjectPointerType())
+      // Convert Objective-C objects to id because we cannot distinguish between
+      // LLVM types for Obj-C classes as they are opaque.
+      ArgType = CGM.getASTContext().getObjCIdType();
+    ArgValue = builder.createBitcast(ArgValue, ConvertType(ArgType));
+
+    mlir::Value Result = builder.create<mlir::cir::IsConstantOp>(
+        getLoc(E->getSourceRange()), ArgValue);
+    if (Result.getType() != ResultType)
+      Result = builder.createBoolToInt(Result, ResultType);
+    return RValue::get(Result);
+  }
   }
 
   // If this is an alias for a lib function (e.g. __builtin_sin), emit
