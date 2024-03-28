@@ -1361,13 +1361,6 @@ public:
   mlir::LogicalResult
   matchAndRewrite(mlir::cir::FlatSwitchOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-                    
-    // Empty switch statement: just erase it.
-    // if (!op.getCases().has_value() || op.getCases()->empty()) {
-    //   rewriter.eraseOp(op);
-    //   return mlir::success();
-    // }
-
     llvm::SmallVector<mlir::APInt, 8> caseValues;
     if (op.getCaseValues()) {
       for (auto val : *op.getCaseValues()) {
@@ -1379,15 +1372,12 @@ public:
     llvm::SmallVector<mlir::Block *, 8> caseDestinations;
     llvm::SmallVector<mlir::ValueRange, 8> caseOperands;
 
-    for (auto x : op.getCaseDestinations()) {
+    for (auto x : op.getCaseDestinations())
       caseDestinations.push_back(x);
-    }
 
-    for (auto x : op.getCaseOperands()) {
+    for (auto x : op.getCaseOperands())
       caseOperands.push_back(x);
-    }
-    
-    // Set switch op to branch to the newly created blocks.
+
     rewriter.setInsertionPoint(op);
     rewriter.replaceOpWithNewOp<mlir::LLVM::SwitchOp>(
         op, adaptor.getCondition(), op.getDefaultDestination(), 
