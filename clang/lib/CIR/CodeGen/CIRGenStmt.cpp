@@ -548,9 +548,16 @@ mlir::LogicalResult CIRGenFunction::buildGotoStmt(const GotoStmt &S) {
   // info support just yet, look at this again once we have it.
   assert(builder.getInsertionBlock() && "not yet implemented");
 
+  mlir::Block *currBlock = builder.getBlock();
+  mlir::Block *gotoBlock = currBlock;
+  if (!currBlock->empty() &&
+    currBlock->back().hasTrait<mlir::OpTrait::IsTerminator>()) {
+    gotoBlock = builder.createBlock(builder.getBlock()->getParent());
+    builder.setInsertionPointToEnd(gotoBlock);
+  }
+
   // A goto marks the end of a block, create a new one for codegen after
   // buildGotoStmt can resume building in that block.
-
   builder.create<mlir::cir::GotoOp>(getLoc(S.getSourceRange()),
                                     S.getLabel()->getName());
 
@@ -568,16 +575,14 @@ mlir::LogicalResult CIRGenFunction::buildLabel(const LabelDecl *D) {
   mlir::Block *currBlock = builder.getBlock();
   mlir::Block *labelBlock = currBlock;
   if (!currBlock->empty()) {
-    {
-      mlir::OpBuilder::InsertionGuard guard(builder);
-      labelBlock = builder.createBlock(builder.getBlock()->getParent());
-    }
-    builder.create<BrOp>(getLoc(D->getSourceRange()), labelBlock);
+    labelBlock = builder.createBlock(builder.getBlock()->getParent());
+    builder.setInsertionPointToEnd(currBlock);
+    if (!currBlock->back().hasTrait<mlir::OpTrait::IsTerminator>())
+      builder.create<BrOp>(getLoc(D->getSourceRange()), labelBlock);
   }
 
   builder.setInsertionPointToEnd(labelBlock);
   builder.create<mlir::cir::LabelOp>(getLoc(D->getSourceRange()), D->getName());
-  builder.setInsertionPointToEnd(labelBlock);
 
   //  FIXME: emit debug info for labels, incrementProfileCounter
   return mlir::success();
