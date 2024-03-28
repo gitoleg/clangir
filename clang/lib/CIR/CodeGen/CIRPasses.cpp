@@ -74,7 +74,7 @@ namespace mlir {
 
 void populateCIRPreLoweringPasses(OpPassManager &pm) {
   pm.addPass(createFlattenCFGPass());
-  // add other passes here
+  pm.addPass(createGotoSolverPass());
 }
 
 } // namespace mlir

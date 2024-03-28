@@ -3383,6 +3383,25 @@ def CIR_FlatSwitchOp : CIR_Op<"flat.switch", [AttrSizedOperandSegments, Terminat
   ];
 }
 
+def GotoOp : CIR_Op<"goto", [Terminator]> {
+  let summary = "goto";
+  let description = [{ }];
+
+  let arguments = (ins StrAttr:$label);
+  let assemblyFormat = [{ $label attr-dict }];
+
+
+}
+
+def LabelOp : CIR_Op<"label"> {
+  let summary = "label";
+  let description = [{ }];
+
+  let arguments = (ins StrAttr:$label);
+  let assemblyFormat = [{ $label attr-dict }];
+
+}
+
 //===----------------------------------------------------------------------===//
 // Operations Lowered Directly to LLVM IR
 //
