@@ -447,7 +447,11 @@ static bool shouldAssumeDSOLocal(const CIRGenModule &CGM,
     return false;
 
   if (CGOpts.DirectAccessExternalData) {
-    llvm_unreachable("-fdirect-access-external-data not supported");
+    if (auto gv = dyn_cast<mlir::cir::GlobalOp>(GV.getOperation()))
+      return !gv.getTlsModel().has_value();
+
+    if (isa<mlir::cir::FuncOp>(GV) && !CGOpts.NoPLT && RM == llvm::Reloc::Static)
+      return true;
   }
 
   // If we can use copy relocations we can assume it is local.
