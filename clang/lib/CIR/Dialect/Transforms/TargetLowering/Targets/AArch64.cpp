@@ -132,10 +132,11 @@ ABIArgInfo AArch64ABIInfo::classifyReturnType(Type RetTy,
       mlir::Type baseTy = mlir::cir::IntType::get(LT.getMLIRContext(), 64, false);
       return ABIArgInfo::getDirect(mlir::cir::ArrayType::get(LT.getMLIRContext(), baseTy, Size / 64));
     }
-     llvm_unreachable("NYI"); 
+
+    llvm_unreachable("NYI");
   }
 
-  llvm_unreachable("NYI");
+  return getNaturalAlignIndirect(RetTy);
 }
 
 ABIArgInfo

@@ -151,6 +151,7 @@ void LowerModule::constructAttributeList(StringRef Name,
     cir_tl_assert(!::cir::MissingFeatures::noFPClass());
     break;
   case ABIArgInfo::Ignore:
+  case ABIArgInfo::Indirect:
     break;
   default:
     llvm_unreachable("Missing ABIArgInfo::Kind");
