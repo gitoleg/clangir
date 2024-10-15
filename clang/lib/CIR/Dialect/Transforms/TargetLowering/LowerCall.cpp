@@ -219,6 +219,9 @@ void LowerModule::constructAttributeList(StringRef Name,
       // Attrs.addStackAlignmentAttr(llvm::MaybeAlign(AI.getDirectAlign()));
       cir_tl_assert(!::cir::MissingFeatures::noFPClass());
       break;
+    case ABIArgInfo::Indirect:
+      // TODO: add attributes
+      break;
     default:
       llvm_unreachable("Missing ABIArgInfo::Kind");
     }

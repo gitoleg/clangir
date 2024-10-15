@@ -26,6 +26,8 @@
 #include "clang/CIR/TypeEvaluationKind.h"
 #include "llvm/Support/ErrorHandling.h"
 
+#include <iostream>
+
 using ABIArgInfo = ::cir::ABIArgInfo;
 
 namespace mlir {
@@ -68,6 +70,64 @@ Value enterStructPointerForCoercedAccess(Value SrcPtr, StructType SrcSTy,
                  // above.
 }
 
+/// CoerceIntOrPtrToIntOrPtr - Convert a value Val to the specific Ty where both
+/// are either integers or pointers.  This does a truncation of the value if it
+/// is too large or a zero extension if it is too small.
+///
+/// This behaves as if the value were coerced through memory, so on big-endian
+/// targets the high bits are preserved in a truncation, while little-endian
+/// targets preserve the low bits.
+static Value coerceIntOrPtrToIntOrPtr(Value val, Type typ, LowerFunction& CGF) {
+  if (val.getType() == typ)
+    return val;
+
+  auto& bld = CGF.getRewriter();
+
+  if (isa<PointerType>(val.getType())) {
+    // If this is Pointer->Pointer avoid conversion to and from int.
+    if (isa<PointerType>(typ)) 
+      return bld.create<CastOp>(val.getLoc(), typ, CastKind::bitcast, val);
+   
+    // Convert the pointer to an integer so we can play with its width.
+    val = bld.create<CastOp>(val.getLoc(), typ, CastKind::ptr_to_int, val);
+  }
+
+  auto dstIntTy = typ;
+  if (isa<PointerType>(dstIntTy))
+    llvm_unreachable("NYI");
+
+  if (val.getType() != dstIntTy) {
+    const auto& layout = CGF.LM.getDataLayout();
+    if (layout.isBigEndian()) {
+      // Preserve the high bits on big-endian targets.
+      // That is what memory coercion does.
+      uint64_t srcSize = layout.getTypeSizeInBits(val.getType());
+      uint64_t dstSize = layout.getTypeSizeInBits(dstIntTy);      
+      uint64_t diff = srcSize > dstSize ? srcSize - dstSize : dstSize - srcSize;
+      auto loc = val.getLoc();
+      if (srcSize > dstSize) {
+        auto intAttr = IntAttr::get(val.getType(), diff);
+        auto amount = bld.create<ConstantOp>(loc, intAttr);
+        val = bld.create<ShiftOp>(loc, val.getType(), val, amount, false);
+        val = bld.create<CastOp>(loc, dstIntTy, CastKind::integral, val);
+      } else {
+        val = bld.create<CastOp>(loc, dstIntTy, CastKind::integral, val);
+        auto intAttr = IntAttr::get(val.getType(), diff);
+        auto amount = bld.create<ConstantOp>(loc, intAttr);
+        val = bld.create<ShiftOp>(loc, val.getType(), val, amount, true);
+      }
+    } else {
+      // Little-endian targets preserve the low bits. No shifts required.
+      val = bld.create<CastOp>(val.getLoc(), dstIntTy, CastKind::integral, val);
+    }
+  }
+                                               
+  if (isa<PointerType>(typ))
+    val = bld.create<CastOp>(val.getLoc(), typ, CastKind::int_to_ptr, val);
+
+  return val;
+}
+
 /// Create a store to \param Dst from \param Src where the source and
 /// destination may have different types.
 ///
@@ -81,17 +141,6 @@ void createCoercedStore(Value Src, Value Dst, bool DstIsVolatile,
     llvm_unreachable("NYI");
   }
 
-  // FIXME(cir): We need a better way to handle datalayout queries.
-  cir_tl_assert(isa<IntType>(SrcTy));
-  llvm::TypeSize SrcSize = CGF.LM.getDataLayout().getTypeAllocSize(SrcTy);
-
-  if (StructType DstSTy = dyn_cast<StructType>(DstTy)) {
-    Dst = enterStructPointerForCoercedAccess(Dst, DstSTy,
-                                             SrcSize.getFixedValue(), CGF);
-    cir_tl_assert(isa<PointerType>(Dst.getType()));
-    DstTy = cast<PointerType>(Dst.getType()).getPointee();
-  }
-
   PointerType SrcPtrTy = dyn_cast<PointerType>(SrcTy);
   PointerType DstPtrTy = dyn_cast<PointerType>(DstTy);
   // TODO(cir): Implement address space.
@@ -99,21 +148,40 @@ void createCoercedStore(Value Src, Value Dst, bool DstIsVolatile,
     llvm_unreachable("NYI");
   }
 
-  // If the source and destination are integer or pointer types, just do an
-  // extension or truncation to the desired type.
-  if ((isa<IntegerType>(SrcTy) || isa<PointerType>(SrcTy)) &&
-      (isa<IntegerType>(DstTy) || isa<PointerType>(DstTy))) {
-    llvm_unreachable("NYI");
-  }
+  llvm::TypeSize SrcSize = CGF.LM.getDataLayout().getTypeAllocSize(SrcTy);  
+  auto dstPtrTy = dyn_cast<PointerType>(DstTy);
 
-  llvm::TypeSize DstSize = CGF.LM.getDataLayout().getTypeAllocSize(DstTy);
+  if (dstPtrTy) 
+    if (auto dstSTy = dyn_cast<StructType>(dstPtrTy.getPointee()))
+      if (SrcTy != dstSTy)
+        Dst = enterStructPointerForCoercedAccess(Dst, dstSTy,
+                                                 SrcSize.getFixedValue(), CGF);
+  
+  auto& layout = CGF.LM.getDataLayout();
+  llvm::TypeSize DstSize = dstPtrTy 
+                           ? layout.getTypeAllocSize(dstPtrTy.getPointee())
+                           : layout.getTypeAllocSize(DstTy);
+  
 
-  // If store is legal, just bitcast the src pointer.
-  cir_tl_assert(!::cir::MissingFeatures::vectorType());
-  if (SrcSize.getFixedValue() <= DstSize.getFixedValue()) {
-    // Dst = Dst.withElementType(SrcTy);
-    CGF.buildAggregateStore(Src, Dst, DstIsVolatile);
-  } else {
+ if (SrcSize.isScalable() || SrcSize <= DstSize) {
+  if (isa<IntType>(SrcTy) && dstPtrTy && isa<PointerType>(dstPtrTy.getPointee())
+    && SrcSize == layout.getTypeAllocSize(dstPtrTy.getPointee())) {
+      // TODO: double check the condition
+      llvm_unreachable("NYI");
+    } else if (auto STy = dyn_cast<StructType>(SrcTy)) {
+      llvm_unreachable("NYI");
+    } else {
+      CGF.buildAggregateStore(Src, Dst, DstIsVolatile);      
+    }
+  } else if (isa<IntType>(SrcTy)) {
+    auto& bld = CGF.getRewriter();
+    auto* ctxt = CGF.LM.getMLIRContext();
+    auto dstIntTy = IntType::get(ctxt, DstSize.getFixedValue() * 8, false);
+    Src = coerceIntOrPtrToIntOrPtr(Src, dstIntTy, CGF);
+    auto ptrTy = PointerType::get(ctxt, dstIntTy);
+    auto addr = bld.create<CastOp>(Dst.getLoc(), ptrTy, CastKind::bitcast, Dst);
+    bld.create<StoreOp>(Dst.getLoc(), Src, addr);
+  } else {  
     llvm_unreachable("NYI");
   }
 }
@@ -401,6 +469,31 @@ LowerFunction::buildFunctionProlog(const LowerFunctionInfo &FI, FuncOp Fn,
       rewriter.replaceAllUsesWith(argAlloca, Alloca);
       rewriter.eraseOp(firstStore);
       rewriter.eraseOp(argAlloca.getDefiningOp());
+      break;
+    }
+    case ABIArgInfo::Indirect: {
+      auto AI = Fn.getArgument(FirstIRArg);
+      auto ptrTy = rewriter.getType<PointerType>(Arg.getType());
+      ArgVals.push_back(AI);
+
+      Value arg = SrcFn.getArgument(ArgNo);
+      cir_tl_assert(arg.hasOneUse());
+      auto *firstStore = *arg.user_begin();
+      auto argAlloca = cast<StoreOp>(firstStore).getAddr();
+
+      rewriter.setInsertionPoint(argAlloca.getDefiningOp());
+      auto newAlloca = rewriter.create<AllocaOp>(
+          Fn.getLoc(), rewriter.getType<PointerType>(ptrTy), ptrTy,
+          /*name=*/StringRef(""),
+          /*alignment=*/rewriter.getI64IntegerAttr(8));
+
+      rewriter.create<StoreOp>(newAlloca.getLoc(), AI, newAlloca.getResult());
+      auto load = rewriter.create<LoadOp>(newAlloca.getLoc(), newAlloca.getResult());
+
+      rewriter.replaceAllUsesWith(argAlloca, load);
+      rewriter.eraseOp(firstStore);
+      rewriter.eraseOp(argAlloca.getDefiningOp());
+
       break;
     }
     default:
