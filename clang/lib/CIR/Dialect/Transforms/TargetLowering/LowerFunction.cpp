@@ -163,9 +163,9 @@ void createCoercedStore(Value Src, Value Dst, bool DstIsVolatile,
                            : layout.getTypeAllocSize(DstTy);
   
 
- if (SrcSize.isScalable() || SrcSize <= DstSize) {
-  if (isa<IntType>(SrcTy) && dstPtrTy && isa<PointerType>(dstPtrTy.getPointee())
-    && SrcSize == layout.getTypeAllocSize(dstPtrTy.getPointee())) {
+  if (SrcSize.isScalable() || SrcSize <= DstSize) {
+    if (isa<IntType>(SrcTy) && dstPtrTy && isa<PointerType>(dstPtrTy.getPointee())
+      && SrcSize == layout.getTypeAllocSize(dstPtrTy.getPointee())) {
       // TODO: double check the condition
       llvm_unreachable("NYI");
     } else if (auto STy = dyn_cast<StructType>(SrcTy)) {
