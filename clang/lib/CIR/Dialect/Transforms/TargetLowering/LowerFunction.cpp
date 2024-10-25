@@ -10,7 +10,7 @@
 // are adapted to operate on the CIR dialect, however.
 //
 //===----------------------------------------------------------------------===//
-
+#include <iostream>
 #include "LowerFunction.h"
 #include "CIRToCIRArgMapping.h"
 #include "LowerCall.h"
@@ -595,6 +595,10 @@ LogicalResult LowerFunction::rewriteCallOp(CallOp op,
   
   cir_cconv_assert(fnType && "No source function type");
 
+  std::cout << "fnType is\n";
+  fnType.dump();
+
+
   // Rewrite the call operation to abide to the ABI calling convention.
   auto Ret = rewriteCallOp(fnType, SrcFn, op, retValSlot);
 
@@ -625,6 +629,13 @@ Value LowerFunction::rewriteCallOp(FuncType calleeTy, FuncOp origCallee,
   // NOTE(cir): Call args were already emitted in CIRGen. Skip the evaluation
   // order done in CIRGen and just fetch the exiting arguments here.
   Args = callOp.getArgOperands();
+
+  std::cout << "operands\n";
+  for (auto a : Args) 
+    a.dump();
+  std::cout << "\n calleeTy\n";
+  calleeTy.dump();
+
 
   const LowerFunctionInfo &FnInfo = LM.getTypes().arrangeFreeFunctionCall(
       callOp.getArgOperands(), calleeTy, /*chainCall=*/false);
@@ -728,6 +739,13 @@ Value LowerFunction::rewriteCallOp(const LowerFunctionInfo &CallInfo,
     switch (ArgInfo.getKind()) {
     case ABIArgInfo::Extend:
     case ABIArgInfo::Direct: {
+
+      std::cout << "checks: "
+          << !isa<StructType>(ArgInfo.getCoerceToType())
+          << (ArgInfo.getCoerceToType() == info_it->type)
+          << (ArgInfo.getDirectOffset() == 0)
+          << std::endl;
+      info_it->type.dump();
 
       if (isa<BoolType>(info_it->type)) {
         IRCallArgs[FirstIRArg] = *I;

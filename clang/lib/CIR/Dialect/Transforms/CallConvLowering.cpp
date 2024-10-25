@@ -50,6 +50,7 @@ struct CallConvLowering {
       : lowerModule(mod), rewriter(rw), typeConverter(converter) {}
 
   void lower(Operation *op) {
+    
     rewriter.setInsertionPoint(op);
     if (auto fun = dyn_cast<FuncOp>(op))
       lowerFuncOp(fun);
