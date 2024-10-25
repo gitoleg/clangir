@@ -59,6 +59,8 @@ struct CallConvLowering {
       lowerGetGlobalOp(glob);
     else if (auto call = dyn_cast<CallOp>(op))
       lowerCallOp(call);
+    else if (auto load = dyn_cast<LoadOp>(op))
+      lowerLoadOp(load);
   }
 
 private:
@@ -107,8 +109,12 @@ private:
       if (auto fun = findFun(mod, *callee))
         lowerModule.rewriteFunctionCall(op, fun);
     } else {
-      cir_cconv_unreachable("NYI");
+      lowerModule.rewriteFunctionCall(op);
     }
+  }
+
+  void lowerLoadOp(LoadOp op) {
+    rewriter.replaceOpWithNewOp<LoadOp>(op, op.getAddr());
   }
 
 private:

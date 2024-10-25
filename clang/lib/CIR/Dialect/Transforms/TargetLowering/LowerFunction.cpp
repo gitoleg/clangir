@@ -573,8 +573,16 @@ LogicalResult LowerFunction::rewriteCallOp(CallOp op,
   // NOTE(cir): There is no direct way to fetch the function type from the
   // CallOp, so we fetch it from the source function. This assumes the
   // function definition has not yet been lowered.
-  cir_cconv_assert(SrcFn && "No source function");
-  auto fnType = SrcFn.getFunctionType();
+  FuncType fnType;
+  if (SrcFn) {
+    fnType = SrcFn.getFunctionType();
+  } else if (op.isIndirect()) {
+    auto srcFnPtr = op.getIndirectCall();
+    if (auto ptrTy = dyn_cast<PointerType>(srcFnPtr.getType()))
+      fnType = dyn_cast<FuncType>(ptrTy.getPointee());
+  }
+  
+  cir_cconv_assert(fnType && "No source function type");
 
   // Rewrite the call operation to abide to the ABI calling convention.
   auto Ret = rewriteCallOp(fnType, SrcFn, op, retValSlot);
@@ -630,7 +638,7 @@ Value LowerFunction::rewriteCallOp(FuncType calleeTy, FuncOp origCallee,
   //
   // Chain calls use this same code path to add the invisible chain parameter
   // to the function type.
-  if (origCallee.getNoProto() || Chain) {
+  if ((origCallee && origCallee.getNoProto()) || Chain) {
     cir_cconv_assert_or_abort(::cir::MissingFeatures::ABINoProtoFunctions(),
                               "NYI");
   }
@@ -813,6 +821,10 @@ Value LowerFunction::rewriteCallOp(const LowerFunctionInfo &CallInfo,
   // NOTE(cir): We don't know if the callee was already lowered, so we only
   // fetch the name from the callee, while the return type is fetch from the
   // lowering types manager.
+
+  if (Caller.isIndirect())
+    IRCallArgs.insert(IRCallArgs.begin(), Caller.getIndirectCall());
+
   CallOp newCallOp = rewriter.create<CallOp>(
       loc, Caller.getCalleeAttr(), IRFuncTy.getReturnType(), IRCallArgs);
   auto extraAttrs =
