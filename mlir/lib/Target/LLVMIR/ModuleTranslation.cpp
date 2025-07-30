@@ -2127,7 +2127,7 @@ void ModuleTranslation::StackFrame::anchor() {}
 
 static std::unique_ptr<llvm::Module>
 prepareLLVMModule(Operation *m, llvm::LLVMContext &llvmContext,
-                  StringRef name) {
+                  StringRef name) {  
   m->getContext()->getOrLoadDialect<LLVM::LLVMDialect>();
   auto llvmModule = std::make_unique<llvm::Module>(name, llvmContext);
   // ModuleTranslation can currently only construct modules in the old debug
@@ -2153,10 +2153,14 @@ prepareLLVMModule(Operation *m, llvm::LLVMContext &llvmContext,
       return nullptr;
     llvmModule->setDataLayout(*llvmDataLayout);
   }
+  
   if (auto targetTripleAttr =
           m->getDiscardableAttr(LLVM::LLVMDialect::getTargetTripleAttrName()))
     llvmModule->setTargetTriple(
         llvm::Triple(cast<StringAttr>(targetTripleAttr).getValue()));
+
+  if (auto asmAttr = m->getDiscardableAttr(LLVM::LLVMDialect::getModuleLevelAsmAttrName()))
+      llvmModule->setModuleInlineAsm(cast<StringAttr>(asmAttr).getValue());
 
   return llvmModule;
 }
